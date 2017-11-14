@@ -74,6 +74,34 @@ class RegistrationController extends Controller
      */
     public function destroy($id)
     {
-        //
+        try {
+                $meeting = Meeting::findOrFail($id);
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['msg' => 'Could not find meeting with id = '.$id], 500);
+        }
+
+        if(!$user = JWTAuth::parseToken()->authenticate())
+        {
+            return response()->json(['msg' => "User not found", 404]);
+        }
+
+        if (!$meeting->users()->where('users.id', $user->id)->first()) {
+            return response()->json(['msg' => 'user not registered for meeting, delete operation not successful'], 401);
+        };
+
+        $meeting->users()->detach($user->id);
+
+        $response = [
+            'msg' => 'User unregistered for meeting',
+            'meeting' => $meeting,
+            'user' => 'tbd',
+            'register' => [
+                'href' => 'api/v1/meeting/registration',
+                'method' => 'POST',
+                'params' => 'user_id, meeting_id'
+            ]
+        ];
+
+        return response()->json($response, 200);
     }
 }

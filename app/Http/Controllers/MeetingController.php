@@ -128,7 +128,45 @@ class MeetingController extends Controller
      */
     public function update(Request $request, $id)
     {
-        //
+        $this->validate($request, [
+            'title' => 'required',
+            'description' => 'required',
+            'time' => 'required|date_format:YmdHie'
+        ]);
+        
+        if(!$user = JWTAuth::parseToken()->authenticate())
+        {
+            return response()->json(['msg' => "User not found", 404]);
+        }
+
+        $title = $request->input('title');
+        $description = $request->input('description');
+        $time = $request->input('time');
+        $user_id = $user->id;
+
+        $meeting = Meeting::with('users')->findOrFail($id);
+        //return response()->json($request->input('user_id'), 200);
+        if (!$meeting->users()->where('users.id', $user_id)->first()) {
+            return response()->json(['msg' => 'user not registered for meeting, update not successful'], 401);
+        };
+        $meeting->time = Carbon::createFromFormat('YmdHie', $time);
+        $meeting->title = $title;
+        $meeting->description = $description;
+        if (!$meeting->update()) {
+            return response()->json(['msg' => 'Error during updating'], 404);
+        }
+
+        $meeting->view_meeting = [
+            'href' => 'api/v1/meeting/' . $meeting->id,
+            'method' => 'GET'
+        ];
+
+        $response = [
+            'msg' => 'Meeting updated',
+            'meeting' => $meeting
+        ];
+
+        return response()->json($response, 200);
     }
 
     /**

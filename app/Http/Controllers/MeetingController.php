@@ -177,6 +177,40 @@ class MeetingController extends Controller
      */
     public function destroy($id)
     {
-        //
+        try {
+                $meeting = Meeting::findOrFail($id);
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['msg' => 'Could not find meeting with id = '.$id], 500);
+        }
+
+        //$meeting = findAMeeting();
+
+        if (! $user = JWTAuth::parseToken()->authenticate()) {
+            return response()->json(['user_not_found'], 404);
+        }
+
+        if (!$meeting->users()->where('users.id', $user->id)->first()) {
+            return response()->json(['msg' => 'user not registered for meeting, update not successful'], 401);
+        };
+
+        $users = $meeting->users;
+        $meeting->users()->detach();
+        if (!$meeting->delete()) {
+            foreach ($users as $user) {
+                $meeting->users()->attach($user);
+            }
+            return response()->json(['msg' => 'deletion failed'], 404);
+        }
+
+        $response = [
+            'msg' => 'Meeting deleted',
+            'create' => [
+                'href' => 'api/v1/meeting',
+                'method' => 'POST',
+                'params' => 'title, description, time'
+            ]
+        ];
+
+        return response()->json($response, 200);
     }
 }

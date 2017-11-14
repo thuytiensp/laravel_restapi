@@ -4,6 +4,12 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+
+use App\Meeting;
+use JWTAuth;
+use Carbon\Carbon;
+
 class MeetingController extends Controller
 {
     /**
@@ -11,11 +17,18 @@ class MeetingController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
+
+    public function __construct()
+    {
+        $this->middleware('jwt.auth', ['only' => [
+            'store', 'update', 'destroy'
+        ]]);
+    }
+
     public function index()
     {
         //
     }
-
 
 
     /**
@@ -26,7 +39,45 @@ class MeetingController extends Controller
      */
     public function store(Request $request)
     {
-        //
+        $this->validate($request, [
+            'title' => 'required',
+            'description' => 'required',
+            'time' => 'required|date_format:YmdHie'
+        ]);
+
+        if(!$user = JWTAuth::parseToken()->authenticate())
+        {
+            return response()->json(['msg' => "User not found", 404]);
+        }
+
+        $title = $request->input('title');
+        $description = $request->input('description');
+        $time = $request->input('time');
+        $user_id = $user->id;
+
+        $meeting = new Meeting([
+            'time' => Carbon::createFromFormat('YmdHie', $time),
+            'title' => $title,
+            'description' => $description
+        ]);
+        if ($meeting->save()) {
+            $meeting->users()->attach($user_id);//should check if user_id is exist in users table
+            $meeting->view_meeting = [
+                'href' => 'api/v1/meeting/' . $meeting->id,
+                'method' => 'GET'
+            ];
+            $message = [
+                'msg' => 'Meeting created',
+                'meeting' => $meeting
+            ];
+            return response()->json($message, 201);
+        }
+
+        $response = [
+            'msg' => 'Error during creation'
+        ];
+
+        return response()->json($response, 404);
     }
 
     /**
@@ -37,7 +88,6 @@ class MeetingController extends Controller
      */
     public function show($id)
     {
-        //
     }
 
 
